@@ -11,6 +11,8 @@ import {
   Save,
   Sparkles,
   Trash2,
+  Upload,
+  X,
 } from 'lucide-react';
 import {
   calculateSubmissionReadiness,
@@ -61,9 +63,7 @@ function generateFeedback(
     return false;
   };
 
-  if (!teamName) items.push({ status: 'error', message: '팀명이 입력되지 않았습니다' });
-  else if (isGibberish(teamName)) items.push({ status: 'error', message: '팀명이 의미 없는 텍스트입니다 — 실제 팀명을 입력하세요' });
-  else if (teamName.length < 3) items.push({ status: 'warning', message: '팀명이 짧습니다 (3자 이상 권장)' });
+  if (!teamName) items.push({ status: 'warning', message: '팀명을 입력하면 심사에 도움이 됩니다' });
   else items.push({ status: 'success', message: `팀명 "${teamName}" 확인됨` });
 
   for (const [key, value] of Object.entries(fields)) {
@@ -154,6 +154,7 @@ export default function SubmissionStudio({
   const [fields, setFields] = useState<Record<string, string>>(fieldsTemplate);
   const [history, setHistory] = useState<SubmissionDraft[]>([]);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [fileNames, setFileNames] = useState<Record<string, string>>({});
 
   const refresh = useCallback(() => {
     const latest = getLatestSubmissionDraft(hackathonSlug);
@@ -253,27 +254,96 @@ export default function SubmissionStudio({
               key,
               title: key,
               format: key,
-            }))).map((item) => (
-              <label key={item.key} className="grid gap-2">
+            }))).map((item) => {
+              const isPdfOrDoc = /pdf|doc|ppt|zip|csv/i.test(item.format) || /pdf|doc|ppt|zip|csv/i.test(item.key);
+              const isUrlField = /url|web|link|github/i.test(item.format) || /url|web|link|github/i.test(item.key);
+
+              return (
+              <div key={item.key} className="grid gap-2">
                 <span className="flex items-center gap-2 text-sm font-medium text-[var(--fg)]">
                   <FileText size={14} className="text-[var(--muted-fg)]" />
                   {item.title}
                   <span className="badge bg-black/6 text-[var(--muted-fg)] dark:bg-white/8">{item.format}</span>
                 </span>
-                <textarea
-                  value={fields[item.key] ?? ''}
-                  onChange={(event) =>
-                    setFields((prev) => ({
-                      ...prev,
-                      [item.key]: event.target.value,
-                    }))
-                  }
-                  rows={item.format.includes('url') ? 2 : 4}
-                  className="min-h-24 rounded-3xl border border-black/8 bg-white/75 px-4 py-3 text-sm outline-none focus:border-[var(--primary)] dark:border-white/10 dark:bg-white/5"
-                  placeholder={inferPlaceholder(item.key)}
-                />
-              </label>
-            ))}
+
+                {isPdfOrDoc ? (
+                  <div className="space-y-2">
+                    {fileNames[item.key] ? (
+                      <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800 dark:bg-emerald-900/20">
+                        <FileCheck2 size={18} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                        <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300 truncate flex-1">
+                          {fileNames[item.key]}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFileNames(prev => { const n = {...prev}; delete n[item.key]; return n; });
+                            setFields(prev => ({...prev, [item.key]: ''}));
+                          }}
+                          className="rounded-full p-1 text-emerald-500 hover:bg-emerald-100 dark:hover:bg-emerald-800/40 transition"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-black/12 bg-white/50 px-4 py-6 cursor-pointer transition hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 dark:border-white/12 dark:bg-white/3">
+                        <Upload size={24} className="text-[var(--muted-fg)]" />
+                        <span className="text-sm text-[var(--muted-fg)]">클릭하여 파일 선택 또는 드래그 앤 드롭</span>
+                        <span className="text-xs text-[var(--muted-fg)]">{item.format.toUpperCase()} 파일 (최대 2MB)</span>
+                        <input
+                          type="file"
+                          accept={isPdfOrDoc ? '.pdf,.doc,.docx,.ppt,.pptx,.zip,.csv' : '*'}
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (file.size > 2 * 1024 * 1024) {
+                              toast('파일이 2MB를 초과합니다. URL로 제출해주세요.', 'error');
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              setFields(prev => ({...prev, [item.key]: reader.result as string}));
+                              setFileNames(prev => ({...prev, [item.key]: file.name}));
+                              toast(`${file.name} 업로드 완료`, 'success');
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
+                    )}
+                    <div className="text-center">
+                      <span className="text-xs text-[var(--muted-fg)]">또는 URL로 입력:</span>
+                    </div>
+                    <input
+                      type="url"
+                      value={fileNames[item.key] ? '' : (fields[item.key] ?? '')}
+                      onChange={(event) => {
+                        setFileNames(prev => { const n = {...prev}; delete n[item.key]; return n; });
+                        setFields(prev => ({...prev, [item.key]: event.target.value}));
+                      }}
+                      disabled={!!fileNames[item.key]}
+                      className="rounded-2xl border border-black/8 bg-white/75 px-4 py-3 text-sm outline-none focus:border-[var(--primary)] dark:border-white/10 dark:bg-white/5 disabled:opacity-40"
+                      placeholder="https://drive.google.com/... 또는 파일 링크"
+                    />
+                  </div>
+                ) : (
+                  <textarea
+                    value={fields[item.key] ?? ''}
+                    onChange={(event) =>
+                      setFields((prev) => ({
+                        ...prev,
+                        [item.key]: event.target.value,
+                      }))
+                    }
+                    rows={isUrlField ? 2 : 4}
+                    className="min-h-24 rounded-3xl border border-black/8 bg-white/75 px-4 py-3 text-sm outline-none focus:border-[var(--primary)] dark:border-white/10 dark:bg-white/5"
+                    placeholder={inferPlaceholder(item.key)}
+                  />
+                )}
+              </div>
+              );
+            })}
           </div>
 
           <label className="grid gap-2">
