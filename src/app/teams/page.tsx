@@ -1,191 +1,332 @@
-'use client';
+"use client";
 
-import { useState, useMemo } from 'react';
-import { Users, Search, ExternalLink, ChevronDown, UserPlus, Filter } from 'lucide-react';
-import teamsData from '@/data/teams.json';
-import hackathonsData from '@/data/hackathons.json';
-import { Team, Hackathon } from '@/types';
-import { getBadgeColor, cn } from '@/lib/utils';
+import React, { useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useUser } from "@/context/UserContext";
+import { Search, Users, LogIn, Loader2, ShieldCheck, Swords, Ghost, TerminalSquare, Plus, X } from "lucide-react";
+import Link from "next/link";
+import { getTeams } from "@/lib/data-service";
+import { getHackathons } from "@/lib/data-service";
+import { saveLocalTeam } from "@/lib/storage";
+import type { TeamItem } from "@/types";
 
-const teams = teamsData as Team[];
-const hackathons = hackathonsData as Hackathon[];
+const ROLE_OPTIONS = ["프론트엔드", "백엔드", "디자인", "PM", "AI/ML", "데이터", "DevOps", "기획"];
 
 export default function TeamsPage() {
-  const [search, setSearch] = useState('');
-  const [hackathonFilter, setHackathonFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all');
-  const [roleFilter, setRoleFilter] = useState<string>('');
+  const allTeams = useMemo(() => getTeams(), []);
+  const hackathons = useMemo(() => getHackathons(), []);
+  const [teams, setTeams] = useState<TeamItem[]>(allTeams);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "recruiting" | "full">("all");
+  const [showCreate, setShowCreate] = useState(false);
+  const { myTeamId, joinTeam, leaveTeam, isHydrated } = useUser();
 
-  const allRoles = useMemo(() => {
-    const roles = new Set<string>();
-    teams.forEach((t) => t.lookingFor.forEach((r) => roles.add(r)));
-    return Array.from(roles);
-  }, []);
+  // Create team form state
+  const [formName, setFormName] = useState("");
+  const [formSlug, setFormSlug] = useState(hackathons[0]?.slug ?? "");
+  const [formIntro, setFormIntro] = useState("");
+  const [formLookingFor, setFormLookingFor] = useState<string[]>([]);
+  const [formContact, setFormContact] = useState("");
 
-  const filtered = useMemo(() => {
-    let result = [...teams];
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter((t) =>
-        t.name.toLowerCase().includes(q) ||
-        t.intro.toLowerCase().includes(q) ||
-        t.lookingFor.some((r) => r.toLowerCase().includes(q))
-      );
-    }
-    if (hackathonFilter !== 'all') result = result.filter((t) => t.hackathonSlug === hackathonFilter);
-    if (statusFilter === 'open') result = result.filter((t) => t.isOpen);
-    if (statusFilter === 'closed') result = result.filter((t) => !t.isOpen);
-    if (roleFilter) result = result.filter((t) => t.lookingFor.includes(roleFilter));
-    return result;
-  }, [search, hackathonFilter, statusFilter, roleFilter]);
+  const refreshTeams = () => setTeams(getTeams());
+
+  const filteredTeams = teams.filter((t) => {
+    const q = search.toLowerCase();
+    const matchesSearch =
+      t.name.toLowerCase().includes(q) ||
+      t.lookingFor.some((r) => r.toLowerCase().includes(q));
+    const matchesFilter =
+      filter === "all" ? true : filter === "recruiting" ? t.isOpen === true : t.isOpen === false;
+    return matchesSearch && matchesFilter;
+  });
+
+  const handleCreateTeam = () => {
+    if (!formName.trim()) return;
+    saveLocalTeam({
+      name: formName.trim(),
+      hackathonSlug: formSlug,
+      isOpen: true,
+      memberCount: 1,
+      maxSize: 5,
+      lookingFor: formLookingFor,
+      intro: formIntro.trim(),
+      contact: { type: "url", url: formContact.trim() },
+    });
+    setFormName("");
+    setFormIntro("");
+    setFormLookingFor([]);
+    setFormContact("");
+    setShowCreate(false);
+    refreshTeams();
+  };
+
+  const toggleRole = (role: string) => {
+    setFormLookingFor((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+    );
+  };
+
+  if (!isHydrated) return null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <Users className="text-purple-500" size={32} />
-          팀 모집
+    <div className="container mx-auto px-4 py-16 max-w-7xl">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-14">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-foreground text-background font-bold text-xs rounded-full mb-6 shadow-sm uppercase tracking-wider">
+          <Swords className="w-4 h-4" /> Team Building Task
+        </div>
+        <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-4 font-heading text-foreground">
+          작전팀 결성 <span className="text-muted-foreground">목록</span>
         </h1>
-        <p className="text-gray-500 dark:text-gray-400">함께 도전할 팀을 찾거나 새로운 팀을 만들어 보세요</p>
-      </div>
+        <p className="text-xl text-muted-foreground font-medium max-w-2xl">
+          가용한 개발자들을 모아 팀을 구성하세요. 우승을 위한 긴급 편입.
+        </p>
+      </motion.div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 animate-slide-up">
-        {[
-          { label: '전체 팀', value: teams.length, color: 'text-blue-600' },
-          { label: '모집중', value: teams.filter(t => t.isOpen).length, color: 'text-green-600' },
-          { label: '총 인원', value: teams.reduce((s, t) => s + t.memberCount, 0), color: 'text-purple-600' },
-          { label: '빈 자리', value: teams.reduce((s, t) => s + t.maxSize - t.memberCount, 0), color: 'text-orange-600' },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 text-center">
-            <p className={cn('text-2xl font-bold', stat.color)}>{stat.value}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{stat.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="mb-8 space-y-3 animate-slide-up">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input type="text" placeholder="팀 검색..." value={search} onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
-          </div>
-          <div className="relative">
-            <select value={hackathonFilter} onChange={(e) => setHackathonFilter(e.target.value)}
-              className="appearance-none pl-3 pr-8 py-2.5 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm cursor-pointer outline-none">
-              <option value="all">전체 해커톤</option>
-              {hackathons.map((h) => (
-                <option key={h.slug} value={h.slug}>{h.title}</option>
-              ))}
-            </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
+      {/* Control Bar */}
+      <div className="flex flex-col md:flex-row gap-4 mb-10 items-center justify-between bg-surface/80 backdrop-blur-md p-2 rounded-3xl border shadow-sm top-20 z-10 sticky">
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground font-bold" />
+          <input
+            type="text"
+            placeholder="팀 이름 또는 역할로 검색.."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-background border rounded-full py-3.5 pl-12 pr-4 outline-none focus:ring-2 focus:ring-foreground/20 transition-all text-sm font-bold placeholder:font-normal"
+          />
         </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <Filter size={16} className="text-gray-400" />
-          {(['all', 'open', 'closed'] as const).map((s) => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={cn('px-3 py-1 rounded-full text-sm font-medium transition-all',
-                statusFilter === s ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300')}>
-              {s === 'all' ? '전체' : s === 'open' ? '모집중' : '모집완료'}
-            </button>
-          ))}
-          <span className="text-gray-300 dark:text-gray-600">|</span>
-          {allRoles.map((role) => (
-            <button key={role} onClick={() => setRoleFilter(roleFilter === role ? '' : role)}
-              className={cn('px-3 py-1 rounded-full text-sm transition-all',
-                roleFilter === role ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-gray-400')}>
-              {role}
-            </button>
-          ))}
+
+        <div className="flex gap-2 items-center">
+          <button
+            onClick={() => setShowCreate((v) => !v)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-foreground text-background text-sm font-bold hover:scale-105 transition-transform shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> 팀 만들기
+          </button>
+          <div className="flex gap-2 p-1 bg-background rounded-full border">
+            {(["all", "recruiting", "full"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all capitalize relative ${
+                  filter === f ? "text-background" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {filter === f && (
+                  <motion.div layoutId="team-filter" className="absolute inset-0 bg-foreground rounded-full -z-10 shadow-sm" />
+                )}
+                {f === "all" ? "전체" : f === "recruiting" ? "모집중" : "마감"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="mb-4 text-sm text-gray-500 dark:text-gray-400">{filtered.length}개의 팀</div>
-
-      {/* Teams */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-20 animate-fade-in">
-          <div className="text-6xl mb-4">👥</div>
-          <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">검색 결과가 없습니다</h3>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">다른 조건으로 검색해 보세요</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((team, idx) => {
-            const hackathon = hackathons.find((h) => h.slug === team.hackathonSlug);
-            return (
-              <div key={team.teamCode}
-                className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-5 card-hover animate-slide-up"
-                style={{ animationDelay: `${idx * 0.03}s` }}>
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <h3 className="font-bold text-lg">{team.name}</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {hackathon?.title || team.hackathonSlug}
-                    </p>
-                  </div>
-                  <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full shrink-0',
-                    team.isOpen ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400')}>
-                    {team.isOpen ? '모집중' : '마감'}
-                  </span>
+      {/* Create Team Form */}
+      <AnimatePresence>
+        {showCreate && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden mb-10"
+          >
+            <div className="bg-surface border rounded-[2rem] p-8 shadow-sm">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-black font-heading">팀 만들기</h2>
+                <button onClick={() => setShowCreate(false)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-bold mb-2">팀 이름 <span className="text-red-500">*</span></label>
+                  <input
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="예: 긴급출동 A팀"
+                    className="w-full bg-background border px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-foreground/20 text-sm font-medium"
+                  />
                 </div>
+                <div>
+                  <label className="block text-sm font-bold mb-2">해커톤</label>
+                  <select
+                    value={formSlug}
+                    onChange={(e) => setFormSlug(e.target.value)}
+                    className="w-full bg-background border px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-foreground/20 text-sm font-medium"
+                  >
+                    {hackathons.map((h) => (
+                      <option key={h.slug} value={h.slug}>{h.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold mb-2">팀 소개</label>
+                  <textarea
+                    value={formIntro}
+                    onChange={(e) => setFormIntro(e.target.value)}
+                    placeholder="팀의 목표와 방향을 간단히 소개해주세요"
+                    rows={3}
+                    className="w-full bg-background border px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-foreground/20 text-sm font-medium resize-none"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold mb-2">찾는 역할</label>
+                  <div className="flex flex-wrap gap-2">
+                    {ROLE_OPTIONS.map((role) => (
+                      <button
+                        key={role}
+                        onClick={() => toggleRole(role)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                          formLookingFor.includes(role)
+                            ? "bg-foreground text-background border-foreground"
+                            : "bg-background text-muted-foreground hover:border-foreground/30"
+                        }`}
+                      >
+                        {role}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold mb-2">연락처 URL</label>
+                  <input
+                    value={formContact}
+                    onChange={(e) => setFormContact(e.target.value)}
+                    placeholder="https://open.kakao.com/..."
+                    className="w-full bg-background border px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-foreground/20 text-sm font-medium"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleCreateTeam}
+                disabled={!formName.trim()}
+                className="mt-6 px-8 py-3 bg-foreground text-background rounded-full font-bold hover:scale-105 transition-transform shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                팀 생성하기
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{team.intro}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <AnimatePresence mode="popLayout">
+          {filteredTeams.map((team, idx) => {
+            const isMyTeam = team.teamCode === myTeamId;
+            const isFull = !team.isOpen;
 
-                {team.lookingFor.length > 0 && (
-                  <div className="mb-3">
-                    <div className="flex flex-wrap gap-1">
-                      {team.lookingFor.map((role) => (
-                        <span key={role} className="flex items-center gap-1 px-2 py-0.5 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-xs rounded font-medium">
-                          <UserPlus size={10} /> {role}
-                        </span>
-                      ))}
-                    </div>
+            return (
+              <motion.div
+                layout
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.2, delay: idx * 0.05 }}
+                key={team.teamCode}
+                className={`group relative bg-surface border rounded-[2rem] p-7 flex flex-col hover:border-foreground/30 transition-all shadow-sm hover:shadow-md ${
+                  isMyTeam ? "ring-2 ring-foreground" : ""
+                }`}
+              >
+                {isMyTeam && (
+                  <div className="absolute -top-3 left-6 bg-foreground text-background text-[10px] font-black uppercase px-3 py-1 rounded-full shadow-md flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" /> 내 소속 팀
                   </div>
                 )}
 
-                {/* Members */}
-                <div className="flex items-center gap-1 mb-2">
-                  {team.members.map((m) => (
-                    <div key={m.nickname} className="group relative">
-                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold border-2 border-white dark:border-slate-800">
-                        {m.nickname.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10 pointer-events-none">
-                        <div className="bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
-                          {m.nickname} · {m.role} · <span className={getBadgeColor(m.badge)}>{m.badge}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {team.memberCount < team.maxSize && (
-                    <div className="w-7 h-7 rounded-full border-2 border-dashed border-gray-300 dark:border-slate-600 flex items-center justify-center text-gray-400 text-xs">+</div>
+                <div className="flex justify-between items-start mb-6 mt-2">
+                  <div className="w-16 h-16 rounded-2xl bg-muted/50 border flex items-center justify-center font-black font-heading text-2xl group-hover:bg-foreground group-hover:text-background transition-colors">
+                    {team.name.substring(0, 1)}
+                  </div>
+                  {team.isOpen ? (
+                    <span className="bg-green-500/10 text-green-600 px-3 py-1 rounded-full text-xs font-bold border border-green-500/20 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                      모집중
+                    </span>
+                  ) : (
+                    <span className="bg-muted text-muted-foreground px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1">
+                      마감됨
+                    </span>
                   )}
                 </div>
 
-                {/* Progress bar */}
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="flex-1 bg-gray-200 dark:bg-slate-700 rounded-full h-1.5">
-                    <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${(team.memberCount / team.maxSize) * 100}%` }} />
-                  </div>
-                  <span className="text-xs text-gray-500">{team.memberCount}/{team.maxSize}</span>
-                </div>
+                <h3 className="text-2xl font-black mb-2 text-foreground font-heading tracking-tight">{team.name}</h3>
+                <p className="text-sm text-muted-foreground line-clamp-2 mb-4 font-medium leading-relaxed flex-1">
+                  {team.intro || "해커톤 우승을 위해 전진하는 정예 팀입니다"}
+                </p>
 
-                {team.isOpen && (
-                  <a href={team.contact.url} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium">
-                    <ExternalLink size={14} /> 합류 문의
-                  </a>
-                )}
-              </div>
+                <div className="space-y-4">
+                  {/* Hackathon slug badge */}
+                  <Link href={`/hackathons/${team.hackathonSlug}`} className="inline-block">
+                    <span className="text-[10px] font-bold px-2.5 py-1 bg-foreground/10 border rounded-full text-foreground hover:bg-foreground/20 transition-colors">
+                      🏆 {team.hackathonSlug}
+                    </span>
+                  </Link>
+
+                  {/* Looking for roles */}
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {team.lookingFor.slice(0, 3).map((role, i) => (
+                      <span key={i} className="text-[10px] font-bold px-2 py-1 bg-background border rounded-md text-foreground group-hover:border-foreground/20 transition-colors">
+                        #{role}
+                      </span>
+                    ))}
+                    {team.lookingFor.length > 3 && (
+                      <span className="text-[10px] font-bold px-2 py-1 bg-muted rounded-md text-muted-foreground">
+                        +{team.lookingFor.length - 3}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Member count */}
+                  <div className="flex items-center justify-between py-4 border-t border-b border-muted">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-5 h-5 text-muted-foreground" />
+                      <span className="text-xs font-bold text-muted-foreground">
+                        {team.memberCount} / {team.maxSize || 5}명 참여
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    {isMyTeam ? (
+                      <button
+                        onClick={() => leaveTeam()}
+                        className="w-full py-4 rounded-xl bg-background border-2 border-foreground/10 text-foreground font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Ghost className="w-4 h-4" /> 팀 탈퇴하기
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => joinTeam(team.teamCode)}
+                        disabled={isFull || !!myTeamId}
+                        className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
+                          isFull
+                            ? "bg-muted text-muted-foreground cursor-not-allowed"
+                            : !!myTeamId
+                            ? "bg-muted text-muted-foreground cursor-not-allowed border"
+                            : "bg-foreground text-background hover:scale-[1.02] shadow-xl shadow-foreground/10 active:scale-95"
+                        }`}
+                      >
+                        {!!myTeamId ? "이미 소속된 팀이 있습니다" : isFull ? "모집이 마감되었습니다" : "합류 지원하기"}
+                        {!isFull && !myTeamId && <LogIn className="w-4 h-4" />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
             );
           })}
-        </div>
-      )}
+        </AnimatePresence>
+
+        {filteredTeams.length === 0 && (
+          <div className="col-span-full py-20 text-center border-2 border-dashed rounded-[3rem] bg-surface/50 mt-10">
+            <div className="w-20 h-20 bg-background border flex items-center justify-center rounded-[2rem] mx-auto mb-6 rotate-12">
+              <TerminalSquare className="w-10 h-10 text-muted-foreground -rotate-12" />
+            </div>
+            <h3 className="text-2xl font-black mb-2 text-foreground">발견된 작전팀이 없습니다</h3>
+            <p className="text-muted-foreground font-medium">검색 조건이나 필터를 변경해보세요</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

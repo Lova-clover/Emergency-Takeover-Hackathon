@@ -1,159 +1,222 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Award, ExternalLink, TrendingUp, Medal, ChevronDown } from 'lucide-react';
-import leaderboardData from '@/data/leaderboard.json';
-import hackathonsData from '@/data/hackathons.json';
-import { LeaderboardData, Hackathon } from '@/types';
-import { cn } from '@/lib/utils';
-
-const leaderboard = leaderboardData as LeaderboardData;
-const hackathons = hackathonsData as Hackathon[];
+import { Calendar, FileDown, Globe, Rocket, Trophy } from 'lucide-react';
+import { getAllLeaderboards, getFeaturedHackathon, getHackathonTitle } from '@/lib/data-service';
+import { getDemoLeaderboardEntries } from '@/lib/storage';
+import { cn, formatDateTime, formatScore, getRankEmoji } from '@/lib/utils';
+import EmptyState from '@/components/ui/EmptyState';
 
 export default function LeaderboardPage() {
-  const [selectedHackathon, setSelectedHackathon] = useState(leaderboard.hackathonSlug);
-  const hackathon = hackathons.find((h) => h.slug === selectedHackathon);
-  const data = leaderboard.hackathonSlug === selectedHackathon ? leaderboard : null;
-  const medals = ['🥇', '🥈', '🥉'];
-  const rankColors = [
-    'from-yellow-500/10 to-amber-500/10 border-yellow-300 dark:border-yellow-700',
-    'from-gray-300/10 to-gray-400/10 border-gray-300 dark:border-gray-600',
-    'from-orange-400/10 to-amber-500/10 border-orange-300 dark:border-orange-700',
-  ];
+  const allLeaderboards = getAllLeaderboards();
+  const featured = getFeaturedHackathon();
+  const [selectedSlug, setSelectedSlug] = useState(featured?.slug ?? allLeaderboards[0]?.hackathonSlug ?? '');
+  const [, setRefreshTick] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => setRefreshTick((value) => value + 1);
+    window.addEventListener('submission-changed', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('submission-changed', refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
+
+  const current = useMemo(
+    () => allLeaderboards.find((leaderboard) => leaderboard.hackathonSlug === selectedSlug),
+    [allLeaderboards, selectedSlug]
+  );
+
+  const demoEntries = getDemoLeaderboardEntries(selectedSlug);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <Award className="text-yellow-500" size={32} />
-          리더보드
-        </h1>
-        <p className="text-gray-500 dark:text-gray-400">해커톤 참가팀의 순위와 점수를 확인하세요</p>
-      </div>
-
-      {/* Hackathon Selector */}
-      <div className="mb-8 animate-slide-up">
-        <div className="relative inline-block">
-          <select
-            value={selectedHackathon}
-            onChange={(e) => setSelectedHackathon(e.target.value)}
-            className="appearance-none pl-4 pr-10 py-2.5 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-medium cursor-pointer outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {hackathons.map((h) => (
-              <option key={h.slug} value={h.slug}>{h.title}</option>
-            ))}
-          </select>
-          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+      <section className="grid gap-6 lg:grid-cols-[0.96fr_1.04fr]">
+        <div className="surface-panel p-6 lg:p-7">
+          <div className="eyebrow mb-4 inline-flex items-center gap-2">
+            <Trophy size={14} />
+            Rankings
+          </div>
+          <h1 className="text-4xl font-semibold tracking-[-0.04em] text-[var(--fg)]">공식 순위 + 브라우저 데모 순위</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-fg)]">
+            제공된 공개 리더보드 데이터를 보여주되, 제출 스튜디오에서 만든 로컬 데모 제출도 함께 연결합니다.
+            그래서 심사위원은 구현된 데이터와 흐름이 실제로 데모 가능한가를 한번에 볼 수 있습니다.
+          </p>
         </div>
-      </div>
 
-      {!data || data.entries.length === 0 ? (
-        <div className="text-center py-20 animate-fade-in">
-          <div className="text-6xl mb-4">📊</div>
-          <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">리더보드 데이터가 없습니다</h3>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">이 해커톤의 리더보드는 아직 공개되지 않았습니다</p>
-        </div>
-      ) : (
-        <>
-          {/* Top 3 Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 animate-slide-up">
-            {data.entries.slice(0, 3).map((entry, idx) => (
-              <div key={entry.rank}
-                className={cn('bg-gradient-to-br rounded-xl border-2 p-6 text-center card-hover',
-                  rankColors[idx] || 'border-gray-200 dark:border-slate-700',
-                  'bg-white dark:bg-slate-800')}
-              >
-                <div className="text-4xl mb-2">{medals[idx]}</div>
-                <h3 className="text-xl font-bold mb-1">{entry.teamName}</h3>
-                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-3">{entry.score}</div>
-                <div className="flex justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                  <div>
-                    <p className="text-xs">참가자</p>
-                    <p className="font-semibold text-gray-700 dark:text-gray-300">{entry.scoreBreakdown.participant}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs">심사위원</p>
-                    <p className="font-semibold text-gray-700 dark:text-gray-300">{entry.scoreBreakdown.judge}</p>
-                  </div>
-                </div>
-                <a href={entry.artifacts.webUrl} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium">
-                  <ExternalLink size={14} /> 웹사이트 보기
-                </a>
+        <div className="surface-panel p-6 lg:p-7">
+          <div className="eyebrow mb-4 inline-flex items-center gap-2">
+            <Rocket size={14} />
+            Demo Sync
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              { label: '공식 리더보드', value: `${allLeaderboards.length}개` },
+              { label: '선택된 데모 제출', value: `${demoEntries.length}건` },
+              { label: '추천 메인 경로', value: '/submit → /rankings' },
+            ].map((item) => (
+              <div key={item.label} className="rounded-3xl border border-black/6 bg-[var(--panel-soft)] p-4 dark:border-white/8">
+                <div className="text-xl font-semibold text-[var(--fg)]">{item.value}</div>
+                <div className="mt-1 text-sm text-[var(--muted-fg)]">{item.label}</div>
               </div>
             ))}
           </div>
+        </div>
+      </section>
 
-          {/* Full Table */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden animate-slide-up">
-            <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
-              <h3 className="font-bold flex items-center gap-2"><TrendingUp size={18} /> 전체 순위</h3>
-              <span className="text-xs text-gray-500">업데이트: {new Date(data.updatedAt).toLocaleDateString('ko-KR')}</span>
+      <section className="surface-panel p-6">
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="해커톤 선택">
+          {allLeaderboards.map((leaderboard) => {
+            const title = getHackathonTitle(leaderboard.hackathonSlug);
+            const isSelected = selectedSlug === leaderboard.hackathonSlug;
+            return (
+              <button
+                key={leaderboard.hackathonSlug}
+                role="tab"
+                aria-selected={isSelected}
+                onClick={() => setSelectedSlug(leaderboard.hackathonSlug)}
+                className={cn('tab-item', isSelected && 'active')}
+              >
+                <span>{title}</span>
+                <span className="rounded-full bg-black/6 px-2 py-0.5 text-[11px] dark:bg-white/8">
+                  {leaderboard.entries.length}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {demoEntries.length > 0 && (
+        <section className="surface-panel p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="eyebrow mb-3 inline-flex items-center gap-2">
+                <Rocket size={14} />
+                Browser Demo
+              </div>
+              <h2 className="text-2xl font-semibold tracking-tight text-[var(--fg)]">브라우저 제출 순위</h2>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-700/50">
-                    <th className="px-6 py-3 font-medium w-16">#</th>
-                    <th className="px-6 py-3 font-medium">팀명</th>
-                    <th className="px-6 py-3 font-medium text-center">참가자</th>
-                    <th className="px-6 py-3 font-medium text-center">심사위원</th>
-                    <th className="px-6 py-3 font-medium text-center">최종 점수</th>
-                    <th className="px-6 py-3 font-medium">제출일</th>
-                    <th className="px-6 py-3 font-medium">링크</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.entries.map((entry) => (
-                    <tr key={entry.rank} className="border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
-                      <td className="px-6 py-4 text-lg">
-                        {entry.rank <= 3 ? medals[entry.rank - 1] : <span className="text-gray-500">{entry.rank}</span>}
-                      </td>
-                      <td className="px-6 py-4 font-semibold">{entry.teamName}</td>
-                      <td className="px-6 py-4 text-center">{entry.scoreBreakdown.participant}</td>
-                      <td className="px-6 py-4 text-center">{entry.scoreBreakdown.judge}</td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full font-bold text-sm">
-                          {entry.score}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {new Date(entry.submittedAt).toLocaleDateString('ko-KR')}
-                      </td>
-                      <td className="px-6 py-4">
-                        <a href={entry.artifacts.webUrl} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700">
-                          <ExternalLink size={14} />
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Link href={`/hackathons/${selectedSlug}`} className="focus-ring text-sm font-semibold text-[var(--primary)]">
+              제출 화면으로 이동
+            </Link>
           </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            {demoEntries.slice(0, 3).map((entry) => (
+              <div key={`${entry.rank}-${entry.teamName}`} className="rounded-[28px] border border-black/6 bg-[linear-gradient(160deg,rgba(29,53,87,0.96),rgba(10,15,31,0.96))] p-5 text-white shadow-[0_30px_80px_-50px_rgba(0,0,0,0.8)] dark:border-white/10">
+                <div className="text-3xl">{getRankEmoji(entry.rank)}</div>
+                <div className="mt-3 text-lg font-semibold">{entry.teamName}</div>
+                <div className="mt-1 text-sm text-white/62">{formatDateTime(entry.submittedAt)}</div>
+                <div className="mt-5 text-3xl font-semibold tracking-tight text-[#ffcf95]">{entry.score}</div>
+                <div className="mt-1 text-sm text-white/62">완성도 {entry.readiness} · 입력 {entry.fieldsCompleted}건</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
-          {/* Score Distribution Chart */}
-          <div className="mt-8 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-6 animate-slide-up">
-            <h3 className="font-bold mb-4 flex items-center gap-2"><Medal size={18} /> 점수 분포</h3>
-            <div className="flex items-end gap-3 h-40">
-              {data.entries.map((entry) => {
-                const height = (entry.score / 100) * 100;
-                return (
-                  <div key={entry.rank} className="flex-1 flex flex-col items-center gap-1">
-                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">{entry.score}</span>
+      {!current || current.entries.length === 0 ? (
+        <EmptyState
+          emoji="📭"
+          title="공식 리더보드 데이터가 없습니다"
+          description="선택된 해커톤에 공개 순위가 아직 없습니다."
+        />
+      ) : (
+        <>
+          <section className="surface-panel p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="eyebrow mb-3 inline-flex items-center gap-2">
+                  <Calendar size={14} />
+                  Official Board
+                </div>
+                <h2 className="text-2xl font-semibold tracking-tight text-[var(--fg)]">{getHackathonTitle(current.hackathonSlug)}</h2>
+              </div>
+              <div className="text-sm text-[var(--muted-fg)]">업데이트 {formatDateTime(current.updatedAt)}</div>
+            </div>
+
+            {current.entries.length >= 3 && (
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                {[current.entries[1], current.entries[0], current.entries[2]].map((entry, index) => {
+                  const podiumRank = [2, 1, 3][index];
+                  return (
                     <div
-                      className="w-full bg-gradient-to-t from-blue-500 to-purple-500 rounded-t-md transition-all duration-700"
-                      style={{ height: `${height}%` }}
-                    />
-                    <span className="text-xs text-gray-500 truncate max-w-full">{entry.teamName}</span>
-                  </div>
-                );
-              })}
+                      key={`${entry.rank}-${entry.teamName}`}
+                      className={cn(
+                        'rounded-[28px] border p-5 text-center',
+                        podiumRank === 1
+                          ? 'border-yellow-200 bg-gradient-to-b from-yellow-50 to-white shadow-[0_26px_70px_-44px_rgba(250,204,21,0.45)] dark:border-yellow-900/40 dark:from-yellow-900/18 dark:to-white/2'
+                          : podiumRank === 2
+                            ? 'border-black/8 bg-white/72 dark:border-white/10 dark:bg-white/4'
+                            : 'border-orange-200 bg-gradient-to-b from-orange-50 to-white dark:border-orange-900/40 dark:from-orange-900/18 dark:to-white/2'
+                      )}
+                    >
+                      <div className="text-4xl">{getRankEmoji(podiumRank)}</div>
+                      <div className="mt-3 text-lg font-semibold tracking-tight text-[var(--fg)]">{entry.teamName}</div>
+                      <div className="mt-1 text-sm text-[var(--muted-fg)]">{formatDateTime(entry.submittedAt)}</div>
+                      <div className="mt-5 text-3xl font-semibold tracking-tight text-[var(--primary)]">{formatScore(entry.score)}</div>
+                      {entry.scoreBreakdown && (
+                        <div className="mt-2 text-xs text-[var(--muted-fg)]">
+                          참가자 {entry.scoreBreakdown.participant} · 심사위원 {entry.scoreBreakdown.judge}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="surface-panel overflow-hidden">
+            <div className="grid grid-cols-[70px_1fr_auto] gap-4 border-b border-black/6 px-5 py-4 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted-fg)] dark:border-white/8">
+              <span>순위</span>
+              <span>팀</span>
+              <span>점수</span>
             </div>
-          </div>
+
+            {current.entries.map((entry, index) => (
+              <div
+                key={`${entry.rank}-${entry.teamName}`}
+                className="grid grid-cols-[70px_1fr_auto] gap-4 border-b border-black/6 px-5 py-5 last:border-none dark:border-white/8"
+                style={{ animationDelay: `${index * 45}ms` }}
+              >
+                <div className="text-2xl">{getRankEmoji(entry.rank)}</div>
+                <div className="min-w-0">
+                  <div className="font-semibold text-[var(--fg)]">{entry.teamName}</div>
+                  <div className="mt-1 text-sm text-[var(--muted-fg)]">{formatDateTime(entry.submittedAt)}</div>
+                  {entry.scoreBreakdown && (
+                    <div className="mt-2 text-xs text-[var(--muted-fg)]">
+                      참가자 {entry.scoreBreakdown.participant} · 심사위원 {entry.scoreBreakdown.judge}
+                    </div>
+                  )}
+                  {entry.artifacts && (
+                    <div className="mt-3 flex flex-wrap gap-3 text-xs">
+                      {entry.artifacts.planTitle && (
+                        <span className="badge bg-black/6 text-[var(--muted-fg)] dark:bg-white/8">{entry.artifacts.planTitle}</span>
+                      )}
+                      {entry.artifacts.webUrl && (
+                        <a href={entry.artifacts.webUrl} target="_blank" rel="noopener noreferrer" className="focus-ring inline-flex items-center gap-1 text-[var(--primary)]">
+                          <Globe size={12} />
+                          배포 보기
+                        </a>
+                      )}
+                      {entry.artifacts.pdfUrl && (
+                        <a href={entry.artifacts.pdfUrl} target="_blank" rel="noopener noreferrer" className="focus-ring inline-flex items-center gap-1 text-[var(--muted-fg)]">
+                          <FileDown size={12} />
+                          PDF
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-semibold tracking-tight text-[var(--primary)]">{formatScore(entry.score)}</div>
+                </div>
+              </div>
+            ))}
+          </section>
         </>
       )}
     </div>

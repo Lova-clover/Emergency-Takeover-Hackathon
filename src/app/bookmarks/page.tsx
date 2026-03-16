@@ -1,98 +1,86 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { Bookmark, Star, Trash2, ExternalLink, Clock } from 'lucide-react';
-import hackathonsData from '@/data/hackathons.json';
-import { Hackathon, Bookmark as BookmarkType } from '@/types';
+import { Bookmark as BookmarkIcon, Trash2, Clock } from 'lucide-react';
 import { getBookmarks, removeBookmark } from '@/lib/storage';
-import { getStatusColor, getStatusLabel, getDaysLeft, cn } from '@/lib/utils';
-
-const hackathons = hackathonsData as Hackathon[];
+import { getHackathonTitle, getHackathons } from '@/lib/data-service';
+import { cn, formatDate } from '@/lib/utils';
+import { useToast } from '@/components/Toast';
+import EmptyState from '@/components/ui/EmptyState';
+import { useHydrated } from '@/hooks/useHydrated';
 
 export default function BookmarksPage() {
-  const [bookmarks, setBookmarks] = useState<BookmarkType[]>([]);
-
-  useEffect(() => {
-    setBookmarks(getBookmarks());
-  }, []);
-
-  const bookmarkedHackathons = bookmarks
-    .map((b) => ({
-      ...b,
-      hackathon: hackathons.find((h) => h.slug === b.slug),
-    }))
-    .filter((b) => b.hackathon)
-    .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+  const { toast } = useToast();
+  const hydrated = useHydrated();
+  const [, setVersion] = useState(0);
+  const hackathons = getHackathons();
+  const bookmarks = hydrated ? getBookmarks() : [];
 
   const handleRemove = (slug: string) => {
     removeBookmark(slug);
-    setBookmarks(getBookmarks());
+    setVersion((value) => value + 1);
+    toast('북마크에서 제거했습니다', 'info');
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8 animate-fade-in">
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <Bookmark className="text-yellow-500" size={32} />
-          북마크
-        </h1>
-        <p className="text-gray-500 dark:text-gray-400">저장한 해커톤 목록입니다</p>
-      </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+      <section className="mb-8 animate-fade-in">
+        <div className="flex items-center gap-3 mb-3">
+          <BookmarkIcon size={28} className="text-amber-500" />
+          <h1 className="text-3xl font-extrabold tracking-tight">북마크</h1>
+        </div>
+        <p className="text-gray-500 dark:text-gray-400 text-lg">관심 있는 해커톤을 저장하고 관리하세요.</p>
+      </section>
 
-      {bookmarkedHackathons.length === 0 ? (
-        <div className="text-center py-20 animate-fade-in">
-          <div className="text-6xl mb-4">⭐</div>
-          <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">저장한 해커톤이 없습니다</h3>
-          <p className="text-gray-500 dark:text-gray-400 mt-1 mb-6">관심 있는 해커톤의 별 아이콘을 눌러 저장하세요</p>
-          <Link href="/" className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
-            해커톤 둘러보기
-          </Link>
-        </div>
+      {bookmarks.length === 0 ? (
+        <EmptyState
+          emoji="📭"
+          title="저장된 북마크가 없습니다"
+          description="해커톤 목록에서 관심 있는 행사를 북마크하세요."
+          action={<Link href="/" className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors focus-ring">해커톤 목록 보기</Link>}
+        />
       ) : (
-        <div className="space-y-4">
-          {bookmarkedHackathons.map((item) => {
-            const h = item.hackathon!;
-            return (
-              <div key={h.slug} className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-5 card-hover animate-slide-up">
-                <div className="flex items-start gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', getStatusColor(h.status))}>
-                        {getStatusLabel(h.status)}
-                      </span>
-                      {h.status === 'ongoing' && (
-                        <span className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 font-medium">
-                          <Clock size={12} /> {getDaysLeft(h.period.registrationDeadline)}
+        <>
+          <p className="text-sm text-gray-500 mb-6">총 <strong className="text-gray-900 dark:text-gray-100">{bookmarks.length}</strong>개의 북마크</p>
+          <div className="space-y-3">
+            {bookmarks.map((b, i) => {
+              const h = hackathons.find((h) => h.slug === b.slug);
+              const title = h?.title ?? getHackathonTitle(b.slug);
+              return (
+                <div key={b.slug}
+                  className="flex items-center justify-between p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-gray-200/80 dark:border-slate-700/60 hover:border-amber-300 dark:hover:border-amber-700 transition-colors animate-slide-up"
+                  style={{ animationDelay: `${i * 50}ms` }}>
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/hackathons/${b.slug}`} className="font-bold text-base hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus-ring rounded">
+                      {title}
+                    </Link>
+                    {h && (
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <span className={cn('badge text-[10px]',
+                          h.status === 'ongoing' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                          h.status === 'upcoming' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                          'bg-gray-100 text-gray-500'
+                        )}>
+                          {h.status === 'ongoing' ? '진행중' : h.status === 'upcoming' ? '예정' : '종료'}
                         </span>
-                      )}
-                    </div>
-                    <Link href={`/hackathons/${h.slug}`}>
-                      <h3 className="font-bold text-lg hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer mb-1">{h.title}</h3>
-                    </Link>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{h.overview.summary}</p>
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {h.tags.map((tag) => (
-                        <span key={tag} className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded-md font-medium">{tag}</span>
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-2">저장일: {new Date(item.addedAt).toLocaleDateString('ko-KR')}</p>
+                        {h.tags.slice(0, 3).map((t) => (
+                          <span key={t} className="text-[11px] text-gray-400">{t}</span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1"><Clock size={10} /> 북마크 추가: {formatDate(b.addedAt)}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Link href={`/hackathons/${h.slug}`}
-                      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-gray-400 hover:text-blue-600">
-                      <ExternalLink size={16} />
-                    </Link>
-                    <button onClick={() => handleRemove(h.slug)}
-                      className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-gray-400 hover:text-red-500">
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+                  <button onClick={() => handleRemove(b.slug)}
+                    className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors focus-ring"
+                    aria-label={`${title} 북마크 제거`}>
+                    <Trash2 size={16} />
+                  </button>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );

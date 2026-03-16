@@ -1,175 +1,225 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useEffect } from 'react';
-import Link from 'next/link';
-import { Search, Filter, Eye, Users, FileText, ChevronDown, Star, StarOff, Clock, Zap } from 'lucide-react';
-import hackathonsData from '@/data/hackathons.json';
-import { Hackathon } from '@/types';
-import { getStatusColor, getStatusLabel, getDaysLeft, cn } from '@/lib/utils';
-import { isBookmarked, addBookmark, removeBookmark } from '@/lib/storage';
-import { useToast } from '@/components/Toast';
+import React, { useMemo } from "react";
+import { motion } from "framer-motion";
+import Link from "next/link";
+import {
+  ArrowRight,
+  Compass,
+  Users,
+  Trophy,
+  FileSearch,
+  Clock,
+  ChevronRight,
+  AlertTriangle,
+  Flame,
+} from "lucide-react";
+import { getFeaturedHackathon, getHackathons, getTeams, getAllLeaderboards } from "@/lib/data-service";
+import { useCountdown } from "@/hooks/useCountdown";
 
-const hackathons = hackathonsData as Hackathon[];
+function StatBadge({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1 px-5 py-3">
+      <span className="text-2xl md:text-3xl font-black font-heading">{value}</span>
+      <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{label}</span>
+    </div>
+  );
+}
 
-type StatusFilter = 'all' | 'ongoing' | 'upcoming' | 'ended';
-type SortOption = 'latest' | 'popular' | 'participants' | 'deadline';
+function CountdownBlock({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="flex flex-col items-center bg-background/60 backdrop-blur rounded-xl px-4 py-3 min-w-[64px]">
+      <span className="text-2xl font-black font-heading tabular-nums">{String(value).padStart(2, "0")}</span>
+      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</span>
+    </div>
+  );
+}
 
 export default function HomePage() {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [tagFilter, setTagFilter] = useState<string>('');
-  const [sortBy, setSortBy] = useState<SortOption>('latest');
-  const [bookmarksSet, setBookmarksSet] = useState<Set<string>>(new Set());
-  const { addToast } = useToast();
+  const hackathons = useMemo(() => getHackathons(), []);
+  const teams = useMemo(() => getTeams(), []);
+  const leaderboards = useMemo(() => getAllLeaderboards(), []);
+  const featured = useMemo(() => getFeaturedHackathon(), []);
 
-  useEffect(() => {
-    const bm = new Set<string>();
-    hackathons.forEach((h) => { if (isBookmarked(h.slug)) bm.add(h.slug); });
-    setBookmarksSet(bm);
-  }, []);
+  const totalLeaderboardEntries = useMemo(
+    () => leaderboards.reduce((sum, lb) => sum + (lb.entries?.length ?? 0), 0),
+    [leaderboards]
+  );
 
-  const allTags = useMemo(() => {
-    const tags = new Set<string>();
-    hackathons.forEach((h) => h.tags.forEach((t) => tags.add(t)));
-    return Array.from(tags);
-  }, []);
+  const countdownTarget = featured?.period?.submissionDeadlineAt ?? featured?.period?.endAt ?? "";
+  const countdown = useCountdown(countdownTarget);
 
-  const filtered = useMemo(() => {
-    let result = [...hackathons];
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter((h) =>
-        h.title.toLowerCase().includes(q) ||
-        h.overview.summary.toLowerCase().includes(q) ||
-        h.tags.some((t) => t.toLowerCase().includes(q))
-      );
-    }
-    if (statusFilter !== 'all') result = result.filter((h) => h.status === statusFilter);
-    if (tagFilter) result = result.filter((h) => h.tags.includes(tagFilter));
-
-    switch (sortBy) {
-      case 'popular': result.sort((a, b) => b.views - a.views); break;
-      case 'participants': result.sort((a, b) => b.participantCount - a.participantCount); break;
-      case 'deadline': result.sort((a, b) => new Date(a.period.registrationDeadline).getTime() - new Date(b.period.registrationDeadline).getTime()); break;
-      default: result.sort((a, b) => new Date(b.period.competitionStart).getTime() - new Date(a.period.competitionStart).getTime());
-    }
-    return result;
-  }, [search, statusFilter, tagFilter, sortBy]);
-
-  const handleBookmark = (slug: string) => {
-    const next = new Set(bookmarksSet);
-    if (next.has(slug)) { removeBookmark(slug); next.delete(slug); addToast('북마크가 해제되었습니다', 'info'); }
-    else { addBookmark(slug); next.add(slug); addToast('북마크에 저장되었습니다', 'success'); }
-    setBookmarksSet(next);
+  const container = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } },
   };
 
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } },
+  };
+
+  const features = [
+    { title: "해커톤 탐색", desc: "진행 중인 해커톤을 둘러보고 참가 전략을 세우세요.", href: "/hackathons", icon: Compass, span: "md:col-span-3" },
+    { title: "팀 빌딩 캠프", desc: "팀원을 모집하거나 오픈된 팀에 합류하세요.", href: "/teams", icon: Users, span: "md:col-span-3" },
+    { title: "실시간 랭킹", desc: "리더보드를 확인하고 경쟁 현황을 파악하세요.", href: "/rankings", icon: Trophy, span: "md:col-span-3" },
+    { title: "인수인계 감사", desc: "프로젝트 문서와 인사이트를 분석하세요.", href: "/insights", icon: FileSearch, span: "md:col-span-3" },
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Hero */}
-      <div className="mb-10 animate-fade-in">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 p-8 md:p-12 text-white">
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-3">
-              <Zap size={20} className="text-yellow-300" />
-              <span className="text-sm font-medium text-blue-200">AI 서비스개발 히어로의 여정</span>
-            </div>
-            <h1 className="text-3xl md:text-4xl font-bold mb-3">해커톤에 참여하세요</h1>
-            <p className="text-blue-100 text-lg max-w-2xl">
-              데이터 경진대회와 해커톤에서 팀을 구성하고, 함께 도전하세요. 바이브 코딩으로 새로운 서비스를 만들어 보세요!
-            </p>
-            <div className="flex items-center gap-4 mt-6 text-sm text-blue-200">
-              <span className="flex items-center gap-1"><Users size={14} /> {hackathons.reduce((s, h) => s + h.participantCount, 0)}+ 참가자</span>
-              <span className="flex items-center gap-1"><FileText size={14} /> {hackathons.length}개 대회</span>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="flex flex-col min-h-screen">
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-24 overflow-hidden flex flex-col items-center justify-center min-h-[90vh]">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-foreground/5 dark:bg-foreground/10 rounded-[100%] blur-[120px] -z-10 pointer-events-none" />
 
-      {/* Search & Filters */}
-      <div className="mb-8 space-y-4 animate-slide-up">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input type="text" placeholder="해커톤 검색..." value={search} onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
-          </div>
-          <div className="relative">
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="appearance-none pl-3 pr-8 py-2.5 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm cursor-pointer outline-none">
-              <option value="latest">최신순</option>
-              <option value="popular">인기순</option>
-              <option value="participants">참가자순</option>
-              <option value="deadline">마감임박순</option>
-            </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <Filter size={16} className="text-gray-400" />
-          {(['all', 'ongoing', 'upcoming', 'ended'] as StatusFilter[]).map((s) => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={cn('px-3 py-1 rounded-full text-sm font-medium transition-all',
-                statusFilter === s ? 'bg-blue-500 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600')}>
-              {s === 'all' ? '전체' : getStatusLabel(s)}
-            </button>
-          ))}
-          <span className="text-gray-300 dark:text-gray-600">|</span>
-          {allTags.map((tag) => (
-            <button key={tag} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
-              className={cn('px-3 py-1 rounded-full text-sm transition-all',
-                tagFilter === tag ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400 dark:hover:bg-slate-600')}>
-              #{tag}
-            </button>
-          ))}
-        </div>
-      </div>
+        <div className="container mx-auto px-4 relative z-10">
+          <motion.div variants={container} initial="hidden" animate="show" className="max-w-5xl mx-auto text-center space-y-8">
+            <motion.div variants={item}>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border bg-surface/50 backdrop-blur-md text-sm font-medium mb-4">
+                <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                긴급 인수인계 상황실 가동 중
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </div>
+            </motion.div>
 
-      <div className="mb-4 text-sm text-gray-500 dark:text-gray-400">{filtered.length}개의 해커톤</div>
+            <motion.div variants={item}>
+              <h1 className="text-5xl md:text-7xl lg:text-8xl font-black font-heading tracking-tighter leading-[1.1]">
+                긴급 인수인계<br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-foreground to-muted-foreground">상황실</span>
+              </h1>
+            </motion.div>
 
-      {/* Empty State */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-20 animate-fade-in">
-          <div className="text-6xl mb-4">🔍</div>
-          <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">검색 결과가 없습니다</h3>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">다른 검색어나 필터를 시도해 보세요</p>
+            <motion.div variants={item}>
+              <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-medium">
+                전임 개발자는 문서만 남기고 떠났습니다.<br />
+                인수인계 문서만으로 프로젝트를 완벽하게 복구하세요.
+              </p>
+            </motion.div>
+
+            {/* Live Stats */}
+            <motion.div variants={item} className="flex items-center justify-center gap-2 md:gap-4 flex-wrap">
+              <div className="inline-flex items-center divide-x divide-border border rounded-2xl bg-surface/50 backdrop-blur-md">
+                <StatBadge value={hackathons.length} label="해커톤" />
+                <StatBadge value={teams.length} label="팀" />
+                <StatBadge value={totalLeaderboardEntries} label="랭킹 엔트리" />
+              </div>
+            </motion.div>
+
+            <motion.div variants={item} className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+              <Link href="/hackathons">
+                <button className="h-14 px-8 bg-foreground text-background rounded-full font-bold text-lg hover:scale-105 hover:shadow-[0_0_40px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_0_40px_rgba(255,255,255,0.2)] transition-all flex items-center justify-center gap-2">
+                  해커톤 탐색하기 <ArrowRight className="w-5 h-5 ml-1" />
+                </button>
+              </Link>
+              <Link href="/teams">
+                <button className="h-14 px-8 border-2 border-border bg-surface text-foreground rounded-full font-bold text-lg hover:bg-muted transition-all flex items-center justify-center gap-2">
+                  팀에 합류하기 <Users className="w-5 h-5" />
+                </button>
+              </Link>
+            </motion.div>
+          </motion.div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((h, idx) => (
-            <div key={h.slug} className="card-hover bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden animate-slide-up"
-              style={{ animationDelay: `${idx * 0.05}s` }}>
-              <div className="h-2 bg-gradient-to-r from-blue-500 to-purple-500" />
-              <div className="p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(h.status))}>{getStatusLabel(h.status)}</span>
-                  <button onClick={() => handleBookmark(h.slug)} className="text-gray-400 hover:text-yellow-500 transition-colors">
-                    {bookmarksSet.has(h.slug) ? <Star size={18} className="text-yellow-500 fill-yellow-500" /> : <StarOff size={18} />}
-                  </button>
+      </section>
+
+      {/* Featured Hackathon */}
+      {featured && (
+        <section className="py-16 border-t">
+          <div className="container mx-auto px-4 max-w-4xl">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="relative border border-border rounded-3xl p-8 md:p-12 bg-surface/50 overflow-hidden"
+            >
+              <div className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 text-orange-500 text-xs font-bold uppercase tracking-wider">
+                <Flame className="w-3.5 h-3.5" /> Featured
+              </div>
+
+              <h2 className="text-2xl md:text-3xl font-black font-heading tracking-tight mb-3">{featured.title}</h2>
+              <p className="text-muted-foreground mb-6 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                인수인계 마감까지 남은 시간
+              </p>
+
+              {!countdown.isExpired ? (
+                <div className="flex items-center gap-3 mb-8 flex-wrap">
+                  <CountdownBlock value={countdown.days} label="일" />
+                  <CountdownBlock value={countdown.hours} label="시간" />
+                  <CountdownBlock value={countdown.minutes} label="분" />
+                  <CountdownBlock value={countdown.seconds} label="초" />
                 </div>
-                <Link href={`/hackathons/${h.slug}`}>
-                  <h3 className="font-bold text-lg mb-2 line-clamp-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer">{h.title}</h3>
+              ) : (
+                <div className="mb-8 text-lg font-bold text-red-500">마감되었습니다</div>
+              )}
+
+              <div className="flex flex-wrap gap-2 mb-6">
+                {featured.tags?.map((tag) => (
+                  <span key={tag} className="px-3 py-1 bg-muted rounded-full text-sm font-medium">{tag}</span>
+                ))}
+              </div>
+
+              <Link href={`/hackathons/${featured.slug}`}>
+                <button className="px-6 py-3 bg-foreground text-background rounded-full font-bold hover:scale-105 transition-transform flex items-center gap-2">
+                  상세 보기 <ArrowRight className="w-4 h-4" />
+                </button>
+              </Link>
+            </motion.div>
+          </div>
+        </section>
+      )}
+
+      {/* Feature Cards – bento-box */}
+      <section className="py-24 bg-surface/50 border-t relative">
+        <div className="container mx-auto px-4 max-w-6xl">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-black font-heading tracking-tight mb-4">인수인계 상황실 기능</h2>
+            <p className="text-xl text-muted-foreground">문서만으로 프로젝트를 되살려야 합니다. 모든 도구가 준비되어 있습니다.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
+            {features.map((feat) => {
+              const Icon = feat.icon;
+              return (
+                <Link key={feat.href} href={feat.href} className={`${feat.span} group`}>
+                  <motion.div
+                    whileHover={{ y: -4 }}
+                    className="h-full bg-background border rounded-3xl p-10 hover:border-foreground/20 transition-colors"
+                  >
+                    <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                      <Icon className="w-7 h-7 text-foreground" />
+                    </div>
+                    <h3 className="text-2xl font-bold mb-3">{feat.title}</h3>
+                    <p className="text-muted-foreground text-lg leading-relaxed">{feat.desc}</p>
+                    <div className="mt-6 text-sm font-bold text-foreground flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      바로가기 <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </motion.div>
                 </Link>
-                <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-3">{h.overview.summary}</p>
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                  {h.tags.map((tag) => (
-                    <span key={tag} className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded-md font-medium">{tag}</span>
-                  ))}
+              );
+            })}
+
+            {/* CTA card */}
+            <div className="md:col-span-6 bg-foreground text-background flex flex-col justify-center items-center text-center rounded-3xl p-12 shadow-2xl relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-background/20 to-transparent" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 justify-center mb-4">
+                  <Clock className="w-6 h-6" />
+                  <span className="text-sm font-bold uppercase tracking-wider">Emergency Protocol Active</span>
                 </div>
-                {h.status === 'ongoing' && (
-                  <div className="flex items-center gap-1.5 text-sm text-orange-600 dark:text-orange-400 mb-3 font-medium">
-                    <Clock size={14} /><span>{getDaysLeft(h.period.registrationDeadline)}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500 pt-3 border-t border-gray-100 dark:border-slate-700">
-                  <span className="flex items-center gap-1"><Eye size={12} /> {h.views.toLocaleString()}</span>
-                  <span className="flex items-center gap-1"><Users size={12} /> {h.participantCount}</span>
-                  <span className="flex items-center gap-1"><FileText size={12} /> {h.submissionCount}</span>
-                </div>
+                <h3 className="text-3xl font-black font-heading mb-4">지금 바로 복구를 시작하세요</h3>
+                <p className="text-background/80 text-lg mb-8 max-w-lg">
+                  전임자가 남긴 인수인계 문서를 분석하고, 팀을 꾸리고, 프로젝트를 다시 살려내세요.
+                </p>
+                <Link href="/hackathons">
+                  <button className="px-8 py-4 bg-background text-foreground rounded-full font-bold hover:scale-105 transition-transform flex items-center gap-2 mx-auto">
+                    상황실 입장 <ArrowRight className="w-5 h-5" />
+                  </button>
+                </Link>
               </div>
             </div>
-          ))}
+          </div>
         </div>
-      )}
+      </section>
     </div>
   );
 }
