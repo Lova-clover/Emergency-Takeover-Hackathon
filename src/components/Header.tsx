@@ -101,6 +101,7 @@ export default function Header() {
 
           <button
             onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))}
+            aria-label="검색 (Ctrl+K)"
             className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-surface border border-border rounded-full text-sm text-muted-foreground hover:bg-muted transition-colors shadow-sm"
           >
             <Search className="w-4 h-4" />
@@ -111,6 +112,8 @@ export default function Header() {
           <button 
             className="md:hidden p-2 -mr-2 text-foreground"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? "메뉴 닫기" : "메뉴 열기"}
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>

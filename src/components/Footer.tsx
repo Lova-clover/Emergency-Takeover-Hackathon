@@ -20,7 +20,7 @@ export default function Footer() {
           </div>
 
           {/* Navigation */}
-          <div>
+          <nav aria-label="서비스 네비게이션">
             <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted-fg)]">서비스</h4>
             <ul className="space-y-2 text-sm">
               <li><Link href="/" className="transition-colors text-[var(--muted-fg)] hover:text-[var(--primary)]">현황판</Link></li>
@@ -28,9 +28,9 @@ export default function Footer() {
               <li><Link href="/rankings" className="transition-colors text-[var(--muted-fg)] hover:text-[var(--primary)]">순위</Link></li>
               <li><Link href="/camp" className="transition-colors text-[var(--muted-fg)] hover:text-[var(--primary)]">캠프</Link></li>
             </ul>
-          </div>
+          </nav>
 
-          <div>
+          <nav aria-label="기능 네비게이션">
             <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted-fg)]">기능</h4>
             <ul className="space-y-2 text-sm">
               <li><Link href="/insights" className="transition-colors text-[var(--muted-fg)] hover:text-[var(--primary)]">인수인계 감사</Link></li>
@@ -38,16 +38,16 @@ export default function Footer() {
               <li><Link href="/bookmarks" className="transition-colors text-[var(--muted-fg)] hover:text-[var(--primary)]">북마크</Link></li>
               <li><Link href="/compare" className="transition-colors text-[var(--muted-fg)] hover:text-[var(--primary)]">비교하기</Link></li>
             </ul>
-          </div>
+          </nav>
 
           {/* External */}
-          <div>
+          <nav aria-label="외부 링크">
             <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted-fg)]">링크</h4>
             <ul className="space-y-2 text-sm">
               <li><a href="https://dacon.io" target="_blank" rel="noopener noreferrer" className="transition-colors text-[var(--muted-fg)] hover:text-[var(--primary)]">DACON</a></li>
               <li><a href="https://daker.ai" target="_blank" rel="noopener noreferrer" className="transition-colors text-[var(--muted-fg)] hover:text-[var(--primary)]">DAKER</a></li>
             </ul>
-          </div>
+          </nav>
         </div>
 
         <div className="mt-8 flex flex-col items-center justify-between gap-2 border-t border-black/6 pt-6 text-center sm:flex-row sm:text-left dark:border-white/8">

@@ -77,9 +77,11 @@ export default function HackathonsPage() {
               ))}
             </select>
           </div>
-          <div className="flex bg-background border rounded-full p-1 h-[52px]">
+          <div className="flex bg-background border rounded-full p-1 h-[52px]" role="group" aria-label="보기 모드 전환">
             <button
               onClick={() => setViewMode("grid")}
+              aria-label="그리드 보기"
+              aria-pressed={viewMode === 'grid'}
               className={`w-12 flex items-center justify-center rounded-full transition-colors relative ${viewMode === 'grid' ? 'text-background' : 'text-muted-foreground hover:text-foreground'}`}
             >
               {viewMode === 'grid' && <motion.div layoutId="view-mode" className="absolute inset-0 bg-foreground rounded-full" />}
@@ -87,6 +89,8 @@ export default function HackathonsPage() {
             </button>
             <button
               onClick={() => setViewMode("list")}
+              aria-label="리스트 보기"
+              aria-pressed={viewMode === 'list'}
               className={`w-12 flex items-center justify-center rounded-full transition-colors relative ${viewMode === 'list' ? 'text-background' : 'text-muted-foreground hover:text-foreground'}`}
             >
               {viewMode === 'list' && <motion.div layoutId="view-mode" className="absolute inset-0 bg-foreground rounded-full" />}
@@ -133,6 +137,7 @@ export default function HackathonsPage() {
                 </div>
                 <button
                   onClick={(e) => { e.preventDefault(); toggleBookmark(hackathon.slug); }}
+                  aria-label={bookmarks.includes(hackathon.slug) ? `${hackathon.title} 북마크 제거` : `${hackathon.title} 북마크 추가`}
                   className="absolute top-4 right-4 p-2.5 rounded-full bg-background/80 backdrop-blur-md hover:bg-background transition-colors shadow-sm"
                 >
                   {bookmarks.includes(hackathon.slug) ?

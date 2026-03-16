@@ -310,6 +310,8 @@ export default function HackathonDetailPage() {
                   </button>
                   <button
                     onClick={() => toggleBookmark(slug)}
+                    aria-label={isBookmarked ? "북마크 제거" : "북마크 추가"}
+                    aria-pressed={isBookmarked}
                     className={`w-full py-4 rounded-xl font-bold text-lg border-2 transition-all flex items-center justify-center gap-2 ${
                       isBookmarked
                         ? "border-foreground bg-background text-foreground"
