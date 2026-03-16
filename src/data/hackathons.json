@@ -4,7 +4,7 @@
     "title": "Aimers 8기 : 모델 경량화 온라인 해커톤",
     "status": "ended",
     "tags": ["LLM", "Compression", "vLLM"],
-    "thumbnailUrl": "https://example.com/public/img/aimers8.png",
+    "thumbnailUrl": "/img/aimers8.svg",
     "period": {
       "timezone": "Asia/Seoul",
       "submissionDeadlineAt": "2026-02-25T10:00:00+09:00",
@@ -21,7 +21,7 @@
     "title": "월간 해커톤 : 바이브 코딩 개선 AI 아이디어 공모전 (2026.02)",
     "status": "ended",
     "tags": ["Idea", "GenAI", "Workflow"],
-    "thumbnailUrl": "https://example.com/public/img/vibe202602.png",
+    "thumbnailUrl": "/img/vibe-coding.svg",
     "period": {
       "timezone": "Asia/Seoul",
       "submissionDeadlineAt": "2026-03-03T10:00:00+09:00",
@@ -38,7 +38,7 @@
     "title": "긴급 인수인계 해커톤: 명세서만 보고 구현하라",
     "status": "ongoing",
     "tags": ["VibeCoding", "Web", "Vercel", "Handover"],
-    "thumbnailUrl": "https://example.com/public/img/daker-handover-202603.png",
+    "thumbnailUrl": "/img/handover.svg",
     "period": {
       "timezone": "Asia/Seoul",
       "submissionDeadlineAt": "2026-03-30T10:00:00+09:00",

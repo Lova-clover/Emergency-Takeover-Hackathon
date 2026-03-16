@@ -27,6 +27,8 @@ export default function TeamsPage() {
   const [formIntro, setFormIntro] = useState("");
   const [formLookingFor, setFormLookingFor] = useState<string[]>([]);
   const [formContact, setFormContact] = useState("");
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [showRecommend, setShowRecommend] = useState(false);
 
   const refreshTeams = () => setTeams(getTeams());
 
@@ -65,6 +67,23 @@ export default function TeamsPage() {
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
     );
   };
+
+  const toggleSkill = (role: string) => {
+    setSelectedSkills((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+    );
+  };
+
+  const recommendedTeams = useMemo(() => {
+    if (selectedSkills.length === 0) return [];
+    return teams
+      .filter((t) => t.isOpen && t.lookingFor.some((r) => selectedSkills.includes(r)))
+      .map((t) => ({
+        ...t,
+        matchCount: t.lookingFor.filter((r) => selectedSkills.includes(r)).length,
+      }))
+      .sort((a, b) => b.matchCount - a.matchCount);
+  }, [teams, selectedSkills]);
 
   if (!isHydrated) return null;
 
@@ -208,6 +227,89 @@ export default function TeamsPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Team Recommendation */}
+      {!myTeamId && (
+        <div className="mb-10">
+          <button
+            onClick={() => setShowRecommend((v) => !v)}
+            className="flex items-center gap-2 text-lg font-black font-heading text-foreground mb-4 hover:opacity-80 transition-opacity"
+          >
+            🎯 나에게 맞는 팀 찾기
+            <span className="text-sm font-bold text-muted-foreground">{showRecommend ? "▲" : "▼"}</span>
+          </button>
+          <AnimatePresence>
+            {showRecommend && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-surface border rounded-[2rem] p-6 shadow-sm">
+                  <p className="text-sm font-bold text-muted-foreground mb-3">내가 가진 역할을 선택하세요:</p>
+                  <div className="flex flex-wrap gap-2 mb-5">
+                    {ROLE_OPTIONS.map((role) => (
+                      <button
+                        key={role}
+                        onClick={() => toggleSkill(role)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                          selectedSkills.includes(role)
+                            ? "bg-foreground text-background border-foreground"
+                            : "bg-background text-muted-foreground hover:border-foreground/30"
+                        }`}
+                      >
+                        {role}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedSkills.length > 0 && (
+                    <div>
+                      <p className="text-sm font-bold text-foreground mb-3">
+                        추천 팀 {recommendedTeams.length}개
+                      </p>
+                      {recommendedTeams.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">선택한 역할을 찾는 팀이 없습니다.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                          {recommendedTeams.map((team) => (
+                            <div
+                              key={team.teamCode}
+                              className="relative bg-background border rounded-2xl p-5 hover:border-foreground/30 transition-all"
+                            >
+                              <span className="absolute -top-2.5 right-4 bg-foreground text-background text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm">
+                                {team.matchCount}개 역할 매칭
+                              </span>
+                              <h4 className="text-lg font-black font-heading tracking-tight text-foreground mb-1">{team.name}</h4>
+                              <p className="text-xs text-muted-foreground line-clamp-1 mb-3 font-medium">
+                                {team.intro || "해커톤 우승을 위해 전진하는 정예 팀입니다"}
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {team.lookingFor.map((role, i) => (
+                                  <span
+                                    key={i}
+                                    className={`text-[10px] font-bold px-2 py-1 rounded-md border ${
+                                      selectedSkills.includes(role)
+                                        ? "bg-foreground text-background border-foreground"
+                                        : "bg-background text-muted-foreground"
+                                    }`}
+                                  >
+                                    #{role}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         <AnimatePresence mode="popLayout">

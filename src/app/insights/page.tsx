@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import {
   BadgeCheck,
+  BarChart3,
   Binary,
   ChartNoAxesCombined,
   ClipboardList,
@@ -10,6 +11,7 @@ import {
   LayoutTemplate,
   ShieldCheck,
   Sparkles,
+  Users,
 } from 'lucide-react';
 import {
   getAllHackathonDetails,
@@ -152,6 +154,75 @@ export default function InsightsPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Visual Analytics */}
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div className="surface-panel p-6 lg:p-7">
+          <div className="eyebrow mb-4 inline-flex items-center gap-2">
+            <BarChart3 size={14} />
+            Score Distribution
+          </div>
+          <h2 className="text-2xl font-semibold tracking-tight text-[var(--fg)]">리더보드 점수 분포</h2>
+          <div className="mt-5 space-y-3">
+            {leaderboards
+              .flatMap((lb) => lb.entries)
+              .sort((a, b) => b.score - a.score)
+              .map((entry, i) => (
+                <div key={`${entry.teamName}-${i}`} className="flex items-center gap-3">
+                  <span className="w-28 shrink-0 truncate text-sm font-semibold text-[var(--fg)]">{entry.teamName}</span>
+                  <div className="relative h-7 flex-1 overflow-hidden rounded-full bg-black/5 dark:bg-white/8">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.max((entry.score / 100) * 100, 2)}%`,
+                        backgroundColor: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'var(--accent, #6366f1)',
+                        opacity: i > 2 ? 0.6 : 1,
+                      }}
+                    />
+                  </div>
+                  <span className="w-12 shrink-0 text-right text-sm font-semibold text-[var(--muted-fg)]">{entry.score}</span>
+                </div>
+              ))}
+            {leaderboards.flatMap((lb) => lb.entries).length === 0 && (
+              <p className="text-sm text-[var(--muted-fg)]">아직 리더보드 데이터가 없습니다.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="surface-panel p-6 lg:p-7">
+          <div className="eyebrow mb-4 inline-flex items-center gap-2">
+            <Users size={14} />
+            Role Demand
+          </div>
+          <h2 className="text-2xl font-semibold tracking-tight text-[var(--fg)]">팀 역할 수요 현황</h2>
+          <div className="mt-5 space-y-3">
+            {(() => {
+              const roleCounts: Record<string, number> = {};
+              teams.forEach((t) => t.lookingFor.forEach((r) => { roleCounts[r] = (roleCounts[r] || 0) + 1; }));
+              const sorted = Object.entries(roleCounts).sort((a, b) => b[1] - a[1]);
+              const max = sorted[0]?.[1] ?? 1;
+              return sorted.map(([role, count]) => (
+                <div key={role} className="flex items-center gap-3">
+                  <span className="w-24 shrink-0 truncate text-sm font-semibold text-[var(--fg)]">{role}</span>
+                  <div className="relative h-7 flex-1 overflow-hidden rounded-full bg-black/5 dark:bg-white/8">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${(count / max) * 100}%`,
+                        backgroundColor: 'var(--accent, #6366f1)',
+                      }}
+                    />
+                  </div>
+                  <span className="w-10 shrink-0 text-right text-sm font-semibold text-[var(--muted-fg)]">{count}팀</span>
+                </div>
+              ));
+            })()}
+            {teams.length === 0 && (
+              <p className="text-sm text-[var(--muted-fg)]">아직 팀 데이터가 없습니다.</p>
+            )}
           </div>
         </div>
       </section>
