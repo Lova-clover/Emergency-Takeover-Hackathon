@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
+  BotMessageSquare,
   FileCheck2,
   FileText,
   Globe,
@@ -32,6 +33,57 @@ interface SubmissionStudioProps {
   submissionItems?: SubmissionItem[];
   title: string;
 }
+
+interface FeedbackItem {
+  status: 'success' | 'warning' | 'error';
+  message: string;
+}
+
+function generateFeedback(
+  fields: Record<string, string>,
+  teamName: string,
+  notes: string
+): FeedbackItem[] {
+  const items: FeedbackItem[] = [];
+
+  if (!teamName) items.push({ status: 'error', message: '팀명이 입력되지 않았습니다' });
+  else if (teamName.length < 3) items.push({ status: 'warning', message: '팀명이 짧습니다 (3자 이상 권장)' });
+  else items.push({ status: 'success', message: `팀명 "${teamName}" 확인됨` });
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (!value?.trim()) {
+      const hint = key.toLowerCase().includes('web')
+        ? ' - Vercel 배포 URL을 입력하세요'
+        : key.toLowerCase().includes('pdf')
+          ? ' - PDF 파일 링크를 첨부하세요'
+          : '';
+      items.push({ status: 'error', message: `${key} 항목이 비어있습니다${hint}` });
+    } else if (value.trim().startsWith('http')) {
+      items.push({ status: 'success', message: `${key}: 유효한 URL 형식` });
+    } else {
+      items.push({ status: 'success', message: `${key}: 입력 완료` });
+    }
+  }
+
+  if (!notes?.trim()) items.push({ status: 'warning', message: '부가 설명을 추가하면 심사에 도움이 됩니다' });
+  else if (notes.trim().length < 20) items.push({ status: 'warning', message: '부가 설명이 짧습니다 — 20자 이상 권장' });
+  else items.push({ status: 'success', message: '부가 설명 작성됨' });
+
+  return items;
+}
+
+function getGrade(readiness: number): { letter: string; color: string; message: string } {
+  if (readiness >= 90) return { letter: 'A', color: '#22c55e', message: '🎉 완벽에 가깝습니다! 제출 준비 완료!' };
+  if (readiness >= 70) return { letter: 'B', color: '#3b82f6', message: '👍 좋은 진행도입니다. 조금만 더 채워보세요.' };
+  if (readiness >= 50) return { letter: 'C', color: '#f59e0b', message: '💪 절반 이상 완성! 빈 항목을 확인하세요.' };
+  return { letter: 'D', color: '#ef4444', message: '🚀 아직 초기 단계입니다. 핵심 항목부터 채워보세요.' };
+}
+
+const statusIcon: Record<string, string> = {
+  success: '✅',
+  warning: '⚠️',
+  error: '❌',
+};
 
 function inferPlaceholder(key: string) {
   if (key.toLowerCase().includes('web')) return 'https://your-demo.vercel.app';
@@ -69,6 +121,7 @@ export default function SubmissionStudio({
   const [notes, setNotes] = useState('');
   const [fields, setFields] = useState<Record<string, string>>(fieldsTemplate);
   const [history, setHistory] = useState<SubmissionDraft[]>([]);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const refresh = useCallback(() => {
     const latest = getLatestSubmissionDraft(hackathonSlug);
@@ -112,6 +165,7 @@ export default function SubmissionStudio({
     setHistory(getSubmissionDrafts(hackathonSlug));
     window.dispatchEvent(new CustomEvent('submission-changed'));
     toast('브라우저에서 제출 초안을 저장했습니다', 'success');
+    setShowFeedback(true);
   };
 
   const handleSubmit = () => {
@@ -265,6 +319,65 @@ export default function SubmissionStudio({
             </ul>
           </div>
         </div>
+
+        {showFeedback && (
+          <div className="surface-panel p-6">
+            <div className="eyebrow mb-3 inline-flex items-center gap-2">
+              <BotMessageSquare size={14} />
+              AI 피드백 리포트
+            </div>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h4 className="text-2xl font-semibold tracking-tight text-[var(--fg)]">제출물 분석</h4>
+              <div
+                className="flex h-12 w-12 items-center justify-center rounded-full text-xl font-black text-white"
+                style={{ backgroundColor: getGrade(readiness).color }}
+              >
+                {getGrade(readiness).letter}
+              </div>
+            </div>
+            <p className="mb-4 text-sm text-[var(--muted-fg)]">{getGrade(readiness).message}</p>
+            <div className="space-y-2">
+              {generateFeedback(fields, teamName, notes).map((fb, i) => (
+                <div
+                  key={i}
+                  className="flex items-start gap-2 rounded-2xl border px-4 py-3 text-sm"
+                  style={{
+                    borderColor:
+                      fb.status === 'error'
+                        ? 'rgba(239,68,68,0.3)'
+                        : fb.status === 'warning'
+                          ? 'rgba(245,158,11,0.3)'
+                          : 'rgba(34,197,94,0.2)',
+                    backgroundColor:
+                      fb.status === 'error'
+                        ? 'rgba(239,68,68,0.06)'
+                        : fb.status === 'warning'
+                          ? 'rgba(245,158,11,0.06)'
+                          : 'rgba(34,197,94,0.04)',
+                  }}
+                >
+                  <span className="shrink-0">{statusIcon[fb.status]}</span>
+                  <span className="text-[var(--fg)]">{fb.message}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 rounded-2xl border border-black/6 bg-[var(--panel-soft)] p-4 text-sm dark:border-white/8">
+              <div className="text-[var(--muted-fg)]">종합 완성도</div>
+              <div className="mt-1 flex items-center gap-3">
+                <div className="h-3 flex-1 overflow-hidden rounded-full bg-black/6 dark:bg-white/8">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${readiness}%`,
+                      backgroundColor: getGrade(readiness).color,
+                    }}
+                  />
+                </div>
+                <span className="font-semibold text-[var(--fg)]">{readiness}점</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="surface-panel p-6">
           <div className="flex items-center justify-between gap-3">

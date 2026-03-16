@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { getFeaturedHackathon, getHackathons, getTeams, getAllLeaderboards } from "@/lib/data-service";
 import { useCountdown } from "@/hooks/useCountdown";
+import ActivityFeed from "@/components/ActivityFeed";
 
 function StatBadge({ value, label }: { value: number; label: string }) {
   return (
@@ -169,6 +170,9 @@ export default function HomePage() {
           </div>
         </section>
       )}
+
+      {/* Activity Feed */}
+      <ActivityFeed />
 
       {/* Feature Cards – bento-box */}
       <section className="py-24 bg-surface/50 border-t relative">
