@@ -115,12 +115,16 @@ export default function HackathonsPage() {
             >
               <div className={`${viewMode === 'list' ? 'w-full md:w-80 h-48 md:h-auto border-r' : 'w-full h-52 border-b'} relative bg-muted flex-shrink-0 overflow-hidden`}>
                 {hackathon.thumbnailUrl ? (
-                  <img src={hackathon.thumbnailUrl} alt={hackathon.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 saturate-0 group-hover:saturate-100" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-muted group-hover:scale-105 transition-transform duration-500">
-                    <Layers className="w-16 h-16 text-muted-foreground" />
-                  </div>
-                )}
+                  <img
+                    src={hackathon.thumbnailUrl}
+                    alt={hackathon.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 saturate-0 group-hover:saturate-100"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : null}
+                <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-muted -z-10 group-hover:scale-105 transition-transform duration-500">
+                  <Layers className="w-16 h-16 text-muted-foreground" />
+                </div>
                 <div className="absolute top-4 left-4">
                   <span className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-full flex items-center gap-1.5 ${getStatusColor(hackathon.status)}`}>
                     {hackathon.status === 'ongoing' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}

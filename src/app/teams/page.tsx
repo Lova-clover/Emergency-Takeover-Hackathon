@@ -112,9 +112,9 @@ export default function TeamsPage() {
                 }`}
               >
                 {filter === f && (
-                  <motion.div layoutId="team-filter" className="absolute inset-0 bg-foreground rounded-full -z-10 shadow-sm" />
+                  <motion.div layoutId="team-filter" className="absolute inset-0 bg-foreground rounded-full shadow-sm" />
                 )}
-                {f === "all" ? "전체" : f === "recruiting" ? "모집중" : "마감"}
+                <span className="relative z-10">{f === "all" ? "전체" : f === "recruiting" ? "모집중" : "마감"}</span>
               </button>
             ))}
           </div>
@@ -289,14 +289,24 @@ export default function TeamsPage() {
                   <div className="pt-2">
                     {isMyTeam ? (
                       <button
-                        onClick={() => leaveTeam()}
+                        onClick={() => {
+                          leaveTeam();
+                          setTeams(prev => prev.map(t =>
+                            t.teamCode === team.teamCode ? { ...t, memberCount: Math.max(0, t.memberCount - 1) } : t
+                          ));
+                        }}
                         className="w-full py-4 rounded-xl bg-background border-2 border-foreground/10 text-foreground font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors flex items-center justify-center gap-2"
                       >
                         <Ghost className="w-4 h-4" /> 팀 탈퇴하기
                       </button>
                     ) : (
                       <button
-                        onClick={() => joinTeam(team.teamCode)}
+                        onClick={() => {
+                          joinTeam(team.teamCode);
+                          setTeams(prev => prev.map(t =>
+                            t.teamCode === team.teamCode ? { ...t, memberCount: t.memberCount + 1 } : t
+                          ));
+                        }}
                         disabled={isFull || !!myTeamId}
                         className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
                           isFull

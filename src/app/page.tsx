@@ -9,6 +9,7 @@ import {
   Users,
   Trophy,
   FileSearch,
+  FileText,
   Clock,
   ChevronRight,
   AlertTriangle,
@@ -62,8 +63,9 @@ export default function HomePage() {
   const features = [
     { title: "해커톤 탐색", desc: "진행 중인 해커톤을 둘러보고 참가 전략을 세우세요.", href: "/hackathons", icon: Compass, span: "md:col-span-3" },
     { title: "팀 빌딩 캠프", desc: "팀원을 모집하거나 오픈된 팀에 합류하세요.", href: "/teams", icon: Users, span: "md:col-span-3" },
-    { title: "실시간 랭킹", desc: "리더보드를 확인하고 경쟁 현황을 파악하세요.", href: "/rankings", icon: Trophy, span: "md:col-span-3" },
-    { title: "인수인계 감사", desc: "프로젝트 문서와 인사이트를 분석하세요.", href: "/insights", icon: FileSearch, span: "md:col-span-3" },
+    { title: "실시간 랭킹", desc: "리더보드를 확인하고 경쟁 현황을 파악하세요.", href: "/rankings", icon: Trophy, span: "md:col-span-2" },
+    { title: "인수인계 감사", desc: "프로젝트 문서와 인사이트를 분석하세요.", href: "/insights", icon: FileSearch, span: "md:col-span-2" },
+    { title: "인수인계 자료실", desc: "전임 개발자가 남긴 메모와 UI 흐름도를 확인하세요.", href: "/source", icon: FileText, span: "md:col-span-2" },
   ];
 
   return (

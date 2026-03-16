@@ -17,7 +17,14 @@ export default function Header() {
   const { bookmarks, myTeamId, isHydrated } = useUser();
 
   useEffect(() => {
-    setThemeState(getTheme());
+    const currentTheme = getTheme();
+    setThemeState(currentTheme);
+    // Apply dark class on initial load
+    if (currentTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
