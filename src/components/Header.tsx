@@ -99,7 +99,10 @@ export default function Header() {
             </Link>
           )}
 
-          <button className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-surface border border-border rounded-full text-sm text-muted-foreground hover:bg-muted transition-colors shadow-sm">
+          <button
+            onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))}
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-surface border border-border rounded-full text-sm text-muted-foreground hover:bg-muted transition-colors shadow-sm"
+          >
             <Search className="w-4 h-4" />
             <span className="pr-4">Search</span>
             <kbd className="hidden lg:inline-flex px-1.5 py-0.5 bg-background rounded text-[10px] uppercase font-mono ml-2 border">Ctrl K</kbd>

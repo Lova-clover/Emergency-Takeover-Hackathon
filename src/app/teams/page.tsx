@@ -12,6 +12,23 @@ import type { TeamItem } from "@/types";
 
 const ROLE_OPTIONS = ["프론트엔드", "백엔드", "디자인", "PM", "AI/ML", "데이터", "DevOps", "기획"];
 
+// Mapping: Korean role → English equivalents in team data
+const ROLE_MAP: Record<string, string[]> = {
+  "프론트엔드": ["Frontend", "프론트엔드", "FE", "Front-end"],
+  "백엔드": ["Backend", "백엔드", "BE", "Back-end"],
+  "디자인": ["Designer", "디자인", "UI/UX", "Design"],
+  "PM": ["PM", "Product Manager"],
+  "AI/ML": ["ML Engineer", "AI/ML", "AI", "ML", "Data Scientist"],
+  "데이터": ["Data", "데이터", "Data Engineer"],
+  "DevOps": ["DevOps", "Infrastructure", "Infra"],
+  "기획": ["기획", "Planner", "Planning"],
+};
+
+function matchesRole(teamRole: string, selectedSkill: string): boolean {
+  const mapped = ROLE_MAP[selectedSkill] ?? [selectedSkill];
+  return mapped.some(m => m.toLowerCase() === teamRole.toLowerCase());
+}
+
 export default function TeamsPage() {
   const allTeams = useMemo(() => getTeams(), []);
   const hackathons = useMemo(() => getHackathons(), []);
@@ -77,10 +94,10 @@ export default function TeamsPage() {
   const recommendedTeams = useMemo(() => {
     if (selectedSkills.length === 0) return [];
     return teams
-      .filter((t) => t.isOpen && t.lookingFor.some((r) => selectedSkills.includes(r)))
+      .filter((t) => t.isOpen && t.lookingFor.some((r) => selectedSkills.some((s) => matchesRole(r, s))))
       .map((t) => ({
         ...t,
-        matchCount: t.lookingFor.filter((r) => selectedSkills.includes(r)).length,
+        matchCount: t.lookingFor.filter((r) => selectedSkills.some((s) => matchesRole(r, s))).length,
       }))
       .sort((a, b) => b.matchCount - a.matchCount);
   }, [teams, selectedSkills]);
