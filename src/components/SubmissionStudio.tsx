@@ -46,26 +46,58 @@ function generateFeedback(
 ): FeedbackItem[] {
   const items: FeedbackItem[] = [];
 
+  // Helper: detect gibberish (no spaces, no Korean, mostly random chars)
+  const isGibberish = (text: string): boolean => {
+    const trimmed = text.trim();
+    if (trimmed.length < 3) return true;
+    const hasKorean = /[가-힣]/.test(trimmed);
+    const hasSpaces = /\s/.test(trimmed);
+    const hasRepeatingChars = /(.)\1{3,}/.test(trimmed);
+    const uniqueRatio = new Set(trimmed.toLowerCase()).size / trimmed.length;
+    if (hasKorean && hasSpaces) return false;
+    if (hasRepeatingChars) return true;
+    if (!hasSpaces && !hasKorean && uniqueRatio < 0.3) return true;
+    if (!hasSpaces && !hasKorean && trimmed.length < 8) return true;
+    return false;
+  };
+
   if (!teamName) items.push({ status: 'error', message: '팀명이 입력되지 않았습니다' });
+  else if (isGibberish(teamName)) items.push({ status: 'error', message: '팀명이 의미 없는 텍스트입니다 — 실제 팀명을 입력하세요' });
   else if (teamName.length < 3) items.push({ status: 'warning', message: '팀명이 짧습니다 (3자 이상 권장)' });
   else items.push({ status: 'success', message: `팀명 "${teamName}" 확인됨` });
 
   for (const [key, value] of Object.entries(fields)) {
-    if (!value?.trim()) {
-      const hint = key.toLowerCase().includes('web')
+    const v = value?.trim() ?? '';
+    const isUrlField = key.toLowerCase().includes('web') || key.toLowerCase().includes('url') || key.toLowerCase().includes('github') || key.toLowerCase().includes('link');
+    const isPdfField = key.toLowerCase().includes('pdf') || key.toLowerCase().includes('doc') || key.toLowerCase().includes('ppt');
+
+    if (!v) {
+      const hint = isUrlField
         ? ' - Vercel 배포 URL을 입력하세요'
-        : key.toLowerCase().includes('pdf')
+        : isPdfField
           ? ' - PDF 파일 링크를 첨부하세요'
           : '';
       items.push({ status: 'error', message: `${key} 항목이 비어있습니다${hint}` });
-    } else if (value.trim().startsWith('http')) {
-      items.push({ status: 'success', message: `${key}: 유효한 URL 형식` });
+    } else if (isGibberish(v)) {
+      items.push({ status: 'error', message: `${key}: 의미 없는 텍스트가 감지됨 — 실제 내용을 입력하세요` });
+    } else if ((isUrlField || isPdfField) && !v.startsWith('http')) {
+      items.push({ status: 'warning', message: `${key}: URL 형식이 아닙니다 (https://로 시작하는 링크를 입력하세요)` });
+    } else if (v.startsWith('http')) {
+      try {
+        new URL(v);
+        items.push({ status: 'success', message: `${key}: 유효한 URL 형식` });
+      } catch {
+        items.push({ status: 'warning', message: `${key}: URL 형식이 올바르지 않습니다` });
+      }
+    } else if (v.length < 5) {
+      items.push({ status: 'warning', message: `${key}: 내용이 너무 짧습니다 (더 상세히 작성하세요)` });
     } else {
       items.push({ status: 'success', message: `${key}: 입력 완료` });
     }
   }
 
   if (!notes?.trim()) items.push({ status: 'warning', message: '부가 설명을 추가하면 심사에 도움이 됩니다' });
+  else if (isGibberish(notes.trim())) items.push({ status: 'error', message: '부가 설명에 의미 없는 텍스트가 감지됨' });
   else if (notes.trim().length < 20) items.push({ status: 'warning', message: '부가 설명이 짧습니다 — 20자 이상 권장' });
   else items.push({ status: 'success', message: '부가 설명 작성됨' });
 

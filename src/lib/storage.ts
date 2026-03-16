@@ -187,6 +187,18 @@ function isLikelyUrl(value: string) {
   return /^https?:\/\//i.test(value.trim());
 }
 
+function isGibberishValue(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length < 3) return true;
+  const hasKorean = /[가-힣]/.test(trimmed);
+  const hasSpaces = /\s/.test(trimmed);
+  if (hasKorean && hasSpaces) return false;
+  if (/(.)\1{3,}/.test(trimmed)) return true;
+  if (!hasSpaces && !hasKorean && new Set(trimmed.toLowerCase()).size / trimmed.length < 0.3) return true;
+  if (!hasSpaces && !hasKorean && trimmed.length < 8 && !isLikelyUrl(trimmed)) return true;
+  return false;
+}
+
 export function calculateSubmissionReadiness(
   fields: Record<string, string>,
   requiredKeys: string[],
@@ -194,11 +206,27 @@ export function calculateSubmissionReadiness(
 ): number {
   const normalized = normalizeFieldMap(fields);
   const fieldCount = requiredKeys.length || Object.keys(normalized).length || 1;
-  const completedRequired = requiredKeys.filter((key) => normalized[key]).length;
-  const optionalCount = Object.values(normalized).filter(Boolean).length - completedRequired;
+
+  // Quality-aware: gibberish or very short values count as 0.2, non-URL values count as 0.6
+  let qualityScore = 0;
+  for (const key of requiredKeys.length ? requiredKeys : Object.keys(normalized)) {
+    const val = normalized[key] ?? '';
+    if (!val) continue;
+    if (isGibberishValue(val)) {
+      qualityScore += 0.15; // nearly no credit for garbage
+    } else if (isLikelyUrl(val)) {
+      qualityScore += 1.0; // full credit for URLs
+    } else if (val.length < 5) {
+      qualityScore += 0.3; // partial credit for very short
+    } else {
+      qualityScore += 0.85; // good text content
+    }
+  }
+
   const urlBonus = Object.values(normalized).some(isLikelyUrl) ? 8 : 0;
-  const notesBonus = notes.trim() ? 6 : 0;
-  const weighted = (completedRequired / fieldCount) * 78 + optionalCount * 4 + urlBonus + notesBonus;
+  const notesTrimmed = notes.trim();
+  const notesBonus = !notesTrimmed ? 0 : isGibberishValue(notesTrimmed) ? 1 : notesTrimmed.length >= 20 ? 6 : 3;
+  const weighted = (qualityScore / fieldCount) * 78 + urlBonus + notesBonus;
   return Math.max(0, Math.min(100, Math.round(weighted)));
 }
 

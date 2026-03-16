@@ -76,14 +76,19 @@ export default function HackathonDetailPage() {
     () => getHackathonDetail(slug),
     [slug]
   );
-  const teams: TeamItem[] = useMemo(
-    () => getTeamsByHackathon(slug),
-    [slug]
-  );
+  const [teams, setTeams] = useState<TeamItem[]>(() => getTeamsByHackathon(slug));
   const leaderboardData: LeaderboardData | undefined = useMemo(
     () => getLeaderboard(slug),
     [slug]
   );
+
+  // Handle team join with memberCount update
+  const handleJoinTeam = useCallback((teamCode: string) => {
+    joinTeam(teamCode);
+    setTeams(prev => prev.map(t =>
+      t.teamCode === teamCode ? { ...t, memberCount: t.memberCount + 1 } : t
+    ));
+  }, [joinTeam]);
 
   // 404
   if (!detail || !hackathon) {
@@ -217,7 +222,7 @@ export default function HackathonDetailPage() {
                     teams={teams}
                     slug={slug}
                     myTeamId={myTeamId}
-                    joinTeam={joinTeam}
+                    joinTeam={handleJoinTeam}
                     campEnabled={sections.teams.campEnabled}
                   />
                 )}
